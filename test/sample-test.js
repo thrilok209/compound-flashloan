@@ -1,18 +1,15 @@
 const {expect} = require("chai");
 const hre = require("hardhat");
-const {deployments, ethers} = hre;
+const {ethers} = hre;
 
 const IERC20_ABI = require("../pre-compiles/IERC20.json");
 const ICDAI_ABI = require("../pre-compiles/ICDAI.json");
 
 const DAI_HOLDER = "0x250e76987d838a75310c34bf422ea9f1ac4cc906"
 
-const daiJoinAddress = ""
-const potAddress = ""
-
 const bytesDATA = "0x0000000000000000000000009759a6ac90977b93b58547b4a71c78317f391a28000000000000000000000000197e90f9fad81970ba7976f33cbd77088e5d7cf7"
 
-describe("Greeter", function() {
+describe("cDAI Flashloan", function() {
 
   let daiInstance;
 
@@ -56,16 +53,19 @@ describe("Greeter", function() {
   });
 
   it("Should return balance", async function() {
-    // let balance = await daiInstance.connect(daiHolder).transfer(hre.network.config.CDAI, "1000000000000")
     let balance = await daiInstance.balanceOf(DAI_HOLDER)
-    console.log((balance).toString())
+    expect(balance).to.not.equal(0);
   });
 
-  it("Should sent balance to COMPOUND_ADMIN", async function() {
+  it("Should sent ETH to COMPOUND_ADMIN", async function() {
     await daiHolder.sendTransaction({
       to: hre.network.config.COMPOUND_ADMIN,
       value: ethers.utils.parseEther("1")
     });
+    
+    let balance = await ethers.provider.getBalance(hre.network.config.COMPOUND_ADMIN)
+    expect(balance).to.be.at.least(ethers.utils.parseEther("1"));
+    expect(balance).to.not.equal(0);
   });
 
   it("Should deploy delegator", async function() {
@@ -75,32 +75,34 @@ describe("Greeter", function() {
     // console.log(greeter)
     var x = await greeter.deployed();
 
+    expect(x.address).not.equal("0x0000000000000000000000000000000000000000")
     cdaiImplementationAddr = x.address
-
   });
 
   it("Should set Implementation", async function() {
-    console.log(cdaiImplementationAddr)
-    console.log(await cdaiInstance.implementation())
+    expect(await cdaiInstance.implementation()).not.equal(cdaiImplementationAddr)
+
     var z = await cdaiInstance.connect(compoundAdmin)._setImplementation(cdaiImplementationAddr, false, bytesDATA)
 
-    console.log(await cdaiInstance.implementation())
-    console.log(z)
+    expect(await cdaiInstance.implementation()).equal(cdaiImplementationAddr)
   });
 
   it("Should give allowance", async function() {
-    var z = await daiInstance.connect(compoundAdmin).approve(cdaiInstance.address, ethers.utils.parseEther("10000"))
-    console.log(z)
+    await daiInstance.connect(compoundAdmin).approve(cdaiInstance.address, ethers.utils.parseEther("10000"))
+    
+    let allowance = await daiInstance.allowance(hre.network.config.COMPOUND_ADMIN, cdaiInstance.address)
+
+    expect(allowance).to.be.at.least(ethers.utils.parseEther("100"));
   });
 
   it("Should take flashloan", async function() {
     var x = await cdaiInstance.connect(compoundAdmin).flashloan(ethers.utils.parseEther("100"))
-
     var logs = await web3.eth.getTransactionReceipt(x.hash)
     logs = logs.logs
 
-    var transferHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-    var filteredLogs = logs.filter(a => a.topics[0] === transferHash)
+    var transferEventHash = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+    var filteredLogs = logs.filter(a => a.topics[0] === transferEventHash)
+    
     console.log(filteredLogs)
   });
 });
