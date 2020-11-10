@@ -169,9 +169,7 @@ contract CDaiDelegate is CErc20Delegate {
 
 
      /**
-      * @notice Accrues DSR then applies accrued interest to total borrows and reserves
-      * @dev This calculates interest accrued from the last checkpointed block
-      *      up to the current block and writes new checkpoint to storage.
+      * @notice Sender receives flashloan
       */
     function flashloan(uint256 amount) public {
         PotLike pot = PotLike(potAddress);
